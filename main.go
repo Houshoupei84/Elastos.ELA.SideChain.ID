@@ -9,6 +9,9 @@ import (
 	"runtime/debug"
 	"strconv"
 	"time"
+	_ "net/http/pprof"
+	netHttp "net/http"
+	"runtime/pprof"
 
 	bc "github.com/elastos/Elastos.ELA.SideChain.ID/blockchain"
 	mp "github.com/elastos/Elastos.ELA.SideChain.ID/mempool"
@@ -54,6 +57,28 @@ func main() {
 	// bursts.  This value was arrived at with the help of profiling live
 	// usage.
 	debug.SetGCPercent(10)
+
+	go func() {
+		netHttp.HandleFunc("/mem", func(w netHttp.ResponseWriter, r *netHttp.Request) {
+			f, err := os.OpenFile("./mem.prof", os.O_RDWR|os.O_CREATE, 0644)
+			if err != nil {
+				return
+			}
+			pprof.WriteHeapProfile(f)
+			defer f.Close()
+		})
+		netHttp.HandleFunc("/cpu", func(w netHttp.ResponseWriter, r *netHttp.Request) {
+			f, err := os.OpenFile("./cpu.prof", os.O_RDWR|os.O_CREATE, 0644)
+			if err != nil {
+				return
+			}
+			pprof.StartCPUProfile(f)
+			defer pprof.StopCPUProfile()
+
+		})
+		netHttp.ListenAndServe(":6060", nil)
+	}()
+
 
 	eladlog.Infof("Node version: %s", Version)
 	eladlog.Info(GoVersion)
